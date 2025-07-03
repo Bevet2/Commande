@@ -19,6 +19,17 @@ def index():
 @app.route('/api/livraison')
 def get_livraison():
     today = datetime.date.today()
+
+    # Mise à jour automatique des valeurs vides uniquement
+    with engine.begin() as conn:
+        update_auto = text("""
+            UPDATE salesforce.lignecommande__c
+            SET nombreexpediee__c = nombrecommande__c
+            WHERE DATE(createddate) = :today
+              AND (nombreexpediee__c IS NULL OR nombreexpediee__c = 0)
+        """)
+        conn.execute(update_auto, {"today": today})
+
     query = text("""
         SELECT 
             lignecommande__c.sfid AS id,
