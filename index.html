@@ -33,11 +33,11 @@
       Object.entries(groupes).forEach(([compte, lignes]) => {
         const bloc = document.createElement('details');
         const sum = document.createElement('summary');
-        sum.innerText = `🏨 ${compte}`;
+        sum.innerText = 🏨 ${compte};
         bloc.appendChild(sum);
 
         const table = document.createElement('table');
-        table.innerHTML = `
+        table.innerHTML =
           <thead>
             <tr>
               <th>Produit</th>
@@ -49,25 +49,24 @@
             </tr>
           </thead>
           <tbody>
-            ${lignes.map(row => `
+            ${lignes.map(row =>
               <tr data-id="${row.id}">
                 <td>${row.produit}</td>
                 <td>${row.nombre_commande}</td>
-                <td><input type="number" value="${row.nombre_expedie || 0}" class="exp"></td>
+                <td>${row.nombre_expedie ?? 0}</td>
                 <td>${row.statut}</td>
                 <td>${new Date(row.createddate).toLocaleString()}</td>
                 <td><textarea class="commentaire">${row.commentaire || ''}</textarea></td>
               </tr>
-            `).join('')}
+            ).join('')}
           </tbody>
-        `;
+        ;
 
         const btn = document.createElement('button');
         btn.textContent = '💾 Enregistrer';
         btn.onclick = async () => {
           const rows = [...table.querySelectorAll('tbody tr')].map(tr => ({
             id: tr.dataset.id,
-            exp: tr.querySelector('.exp').value,
             commentaire: tr.querySelector('.commentaire').value
           }));
           const res = await fetch('/api/save', {
