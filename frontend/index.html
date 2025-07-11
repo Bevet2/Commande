@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bon de livraison (Statut modifiable)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: sans-serif; padding: 1rem; background: #f9f9f9; }
+    h1 { margin-top: 0; }
+    .filtres { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+    label { display: flex; flex-direction: column; font-weight: bold; font-size: 0.9rem; }
+    select, input[type="date"], input[type="text"] { padding: 0.4rem; border: 1px solid #ccc; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: center; }
+    textarea, select.statut { width: 100%; resize: vertical; }
+    button { margin-top: 0.5rem; padding: 0.5rem; background: green; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    .vide { font-style: italic; color: #555; }
+
+    /* ✅ TABLEAU RESPONSIVE */
+    .responsive-table {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-top: 0.5rem;
+    }
+    .responsive-table table {
+      min-width: 700px;
+    }
+  </style>
+</head>
+<body>
+  <h1>📦 Bon de livraison – édition de statut</h1>
+
+  <div class="filtres">
+    <label>📅 Date de livraison <input type="date" id="filtre-date"></label>
+    <label>🔎 Rechercher une commande <input type="text" id="filtre-commande-texte"></label>
+    <label>🏨 Hôtel <select id="filtre-compte"><option value="">(Tous)</option></select></label>
+    <label>🚦 Statut <select id="filtre-statut"><option value="">(Tous)</option></select></label>
+    <label>🧾 Type de devis <select id="filtre-type"><option value="">(Tous)</option></select></label>
+  </div>
+
+  <div id="app2">Chargement en cours...</div>
+
+  <script>
+    let toutesLesDonnees = [];
+    let statutsDispo = [];
+    const modificationsLocales = {};
+
+    async function charger() {
+      const texteCommande = document.getElementById('filtre-commande-texte').value.trim();
+      const date = document.getElementById('filtre-date').value;
+
+      let url = '/api2/livraison';
+      if (texteCommande) {
+        url += `?commande=${encodeURIComponent(texteCommande)}`;
+      } else if (date) {
+        url += `?date=${date}`;
+      }
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Erreur HTTP : ${res.status}`);
+        const data = await res.json();
+        toutesLesDonnees = data.lignes;
+        statutsDispo = data.statuts ?? [];
+
+        if (!statutsDispo.includes("préparé")) {
+          statutsDispo.push("préparé");
+        }
+
+        toutesLesDonnees.forEach(row => {
+          if (modificationsLocales[row.id]) {
+            Object.assign(row, modificationsLocales[row.id]);
+          }
+        });
+
+        actualiserFiltres();
+        afficher();
+      } catch (e) {
+        console.error(e);
+        document.getElementById('app2').innerHTML = `<p class="vide">❌ Erreur de chargement.</p>`;
+      }
+    }
+
+    function actualiserFiltres() {
+      const compteSelect = document.getElementById('filtre-compte');
+      const statutSelect = document.getElementById('filtre-statut');
+      const typeSelect = document.getElementById('filtre-type');
+
+      const comptes = [...new Set(toutesLesDonnees.map(r => r.compte))];
+      compteSelect.innerHTML = '<option value="">(Tous)</option>' + comptes.map(c => `<option value="${c}">${c}</option>`).join('');
+
+      const statuts = [...new Set(toutesLesDonnees.map(r => r.statut))];
+      if (!statuts.includes("préparé")) statuts.push("préparé");
+      statutSelect.innerHTML = '<option value="">(Tous)</option>' + statuts.map(s => `<option value="${s}">${s}</option>`).join('');
+
+      const types = [...new Set(toutesLesDonnees.map(r => r.typededevis__c))];
+      typeSelect.innerHTML = '<option value="">(Tous)</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+    }
+
+    function afficher() {
+      const container = document.getElementById('app2');
+      const texte = document.getElementById('filtre-commande-texte').value.trim().toLowerCase();
+      const compte = document.getElementById('filtre-compte').value;
+      const statut = document.getElementById('filtre-statut').value;
+      const type = document.getElementById('filtre-type').value;
+
+      let data = toutesLesDonnees;
+
+      if (!texte) {
+        data = data.filter(r =>
+          (!compte || r.compte === compte) &&
+          (!statut || r.statut === statut) &&
+          (!type || r.typededevis__c === type)
+        );
+      }
+
+      const groupes = {};
+      data.forEach(row => {
+        if (!groupes[row.compte]) groupes[row.compte] = { lignes: [], commandes: new Set() };
+        groupes[row.compte].lignes.push(row);
+        groupes[row.compte].commandes.add(row.commande);
+      });
+
+      container.innerHTML = '';
+      if (data.length === 0) {
+        container.innerHTML = `<p class="vide">🔍 Aucune donnée ne correspond aux filtres.</p>`;
+        return;
+      }
+
+      Object.entries(groupes).forEach(([compte, info]) => {
+        const bloc = document.createElement('details');
+        bloc.open = true;
+
+        const sum = document.createElement('summary');
+        sum.innerText = `🏨 ${compte} – 📟 Commande(s) : ${Array.from(info.commandes).join(', ')}`;
+        bloc.appendChild(sum);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'responsive-table';
+
+        const table = document.createElement('table');
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Produit</th>
+              <th>Commandé</th>
+              <th>Expédié</th>
+              <th>Qt juste</th>
+              <th>Statut</th>
+              <th>Commentaire</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${info.lignes.map(row => `
+              <tr data-id="${row.id}" data-commande="${row.commande}">
+                <td>${row.produit}</td>
+                <td>${row.nombre_commande}</td>
+                <td>${row.nombre_expedie ?? 0}</td>
+                <td>${row.qt_theorique ?? ''}</td>
+                <td>
+                  <select class="statut" onchange="enregistrerChangement('${row.id}', '${row.commande}', this.value, this.parentElement.nextElementSibling.firstElementChild.value)">
+                    ${statutsDispo.map(s => `<option value="${s}" ${row.statut === s ? 'selected' : ''}>${s}</option>`).join('')}
+                  </select>
+                </td>
+                <td>
+                  <textarea class="commentaire" oninput="enregistrerChangement('${row.id}', '${row.commande}', this.parentElement.previousElementSibling.firstElementChild.value, this.value)">
+                    ${row.commentaire || ''}
+                  </textarea>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        `;
+
+        wrapper.appendChild(table);
+        bloc.appendChild(wrapper);
+
+        const btn = document.createElement('button');
+        btn.textContent = '📤 Sauvegarder';
+        btn.onclick = async () => {
+          const rows = Object.values(modificationsLocales);
+          try {
+            const res = await fetch('/api2/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(rows)
+            });
+            alert(res.ok ? '✅ Données enregistrées' : '❌ Erreur d\'enregistrement');
+          } catch (err) {
+            console.error(err);
+            alert("❌ Problème de connexion à l'API");
+          }
+        };
+
+        bloc.appendChild(btn);
+        container.appendChild(bloc);
+      });
+    }
+
+    function enregistrerChangement(id, commande, statut, commentaire) {
+      modificationsLocales[id] = { id, commande, statut, commentaire };
+      const row = toutesLesDonnees.find(r => r.id === id);
+      if (row) {
+        row.statut = statut;
+        row.commentaire = commentaire;
+      }
+    }
+
+    document.getElementById('filtre-date').addEventListener('input', charger);
+    ['filtre-compte', 'filtre-statut', 'filtre-type'].forEach(id => {
+      document.getElementById(id).addEventListener('input', afficher);
+    });
+    document.getElementById('filtre-commande-texte').addEventListener('input', charger);
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const hier = new Date();
+      hier.setDate(hier.getDate() - 1);
+      document.getElementById('filtre-date').value = hier.toISOString().split('T')[0];
+      charger();
+      setInterval(charger, 5 * 60 * 1000);
+    });
+  </script>
+</body>
+</html>
