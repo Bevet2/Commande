@@ -2,222 +2,374 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Bon de livraison (Statut modifiable)</title>
+  <title>Bon de livraison – Mobile</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: sans-serif; padding: 1rem; background: #f9f9f9; }
-    h1 { margin-top: 0; }
-    .filtres { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
-    label { display: flex; flex-direction: column; font-weight: bold; font-size: 0.9rem; }
-    select, input[type="date"], input[type="text"] { padding: 0.4rem; border: 1px solid #ccc; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
-    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: center; }
-    textarea, select.statut { width: 100%; resize: vertical; }
-    button { margin-top: 0.5rem; padding: 0.5rem; background: green; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    .vide { font-style: italic; color: #555; }
+    :root{
+      --bg:#0b0b0c; --card:#141519; --muted:#9aa3ae; --fg:#e9edf2; --accent:#4ade80;
+      --border:#24262c; --pill:#1e2026; --warn:#ef4444;
+      --radius:14px; --shadow:0 6px 24px rgba(0,0,0,.25);
+      --tap:48px; --gap:12px;
+    }
+    @media (prefers-color-scheme: light){
+      :root{ --bg:#f6f7fb; --card:#ffffff; --muted:#556070; --fg:#111318; --accent:#16a34a; --border:#e8ebf2; --pill:#f1f4f9; }
+    }
 
-    /* ✅ TABLEAU RESPONSIVE */
-    .responsive-table {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      margin-top: 0.5rem;
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background:var(--bg); color:var(--fg);
     }
-    .responsive-table table {
-      min-width: 700px;
+
+    /* Top bar */
+    .topbar{
+      position: sticky; top: 0; z-index: 20;
+      background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,0)) , var(--bg);
+      padding: 12px 12px 8px; backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
     }
+    .row{ display:flex; gap:8px; align-items:center; }
+    .title{ font-weight:700; font-size:18px; flex:1; }
+    .btn{
+      height: var(--tap); padding: 0 14px; border-radius: 999px; border:1px solid var(--border);
+      background: var(--card); color: var(--fg); font-weight:600; display:inline-flex; align-items:center; gap:8px;
+    }
+    .btn[aria-pressed="true"]{ outline:2px solid var(--accent); }
+    .field{
+      height: var(--tap); border-radius: 999px; border:1px solid var(--border);
+      background: var(--card); color: var(--fg); padding: 0 14px; width: 100%;
+    }
+    .grow{ flex:1; }
+
+    /* Drawer filtres */
+    .drawer{
+      position: fixed; inset: auto 0 0 0; background: var(--card);
+      border-top:1px solid var(--border); border-radius: 16px 16px 0 0;
+      transform: translateY(100%); transition: transform .25s ease; z-index: 30;
+      box-shadow: var(--shadow); padding: 12px;
+    }
+    .drawer.open{ transform: translateY(0); }
+    .grid{ display:grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+    .grid .span2{ grid-column: span 2; }
+    label{ font-size:12px; color: var(--muted); display:block; margin-bottom:6px; }
+    select,input[type="date"],input[type="text"]{ width:100%; height: var(--tap); border-radius:10px; border:1px solid var(--border); background: var(--pill); color: var(--fg); padding: 0 12px; }
+    .drawer .actions{ display:flex; gap:8px; margin-top:10px; }
+    .btn-primary{ background: var(--accent); color:#041107; border:none; }
+    .btn-ghost{ background: transparent; }
+
+    /* Group + cards */
+    .content{ padding:12px; }
+    details.group{
+      background: var(--card); border:1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden;
+    }
+    summary{
+      list-style:none; padding:12px; cursor:pointer; display:flex; gap:8px; align-items:center; justify-content: space-between;
+      background: linear-gradient(180deg, rgba(255,255,255,.025), transparent);
+    }
+    summary::-webkit-details-marker{ display:none; }
+    .hotel{ font-weight:700; }
+    .meta{ color:var(--muted); font-size:12px; display:flex; gap:8px; flex-wrap:wrap; }
+
+    .line-card{
+      border-top:1px solid var(--border); padding:12px; display:flex; flex-direction:column; gap:8px;
+    }
+    .head{ display:flex; align-items:center; gap:10px; }
+    .prod{ font-weight:600; font-size:15px; flex:1; min-width:0; }
+    .prod small{ display:block; color:var(--muted); font-weight:500; font-size:12px; }
+    .stats{ display:flex; gap:8px; flex-wrap:wrap; color: var(--muted); font-size:12px; }
+    .chip{ background:var(--pill); border:1px solid var(--border); border-radius:999px; padding:6px 10px; color:var(--fg); }
+    .commande{ margin-left:auto; }
+
+    /* Switch Préparé */
+    .switch{ position:relative; display:inline-flex; align-items:center; gap:8px; user-select:none; }
+    .switch input{ position:absolute; inset:0; opacity:0; width:100%; height:100%; }
+    .slider{
+      width:52px; height:30px; border-radius:999px; background:#2a2e36; border:1px solid var(--border); position:relative; transition:background .2s;
+    }
+    .slider::after{
+      content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; background:#fff; border-radius:50%;
+      box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .2s;
+    }
+    .switch input:checked + .slider{ background: var(--accent); }
+    .switch input:checked + .slider::after{ transform: translateX(22px); }
+    .switch .lbl{ font-weight:700; font-size:13px; }
+
+    .empty{ color:var(--muted); text-align:center; padding:24px; }
+
+    /* Safe tap targets */
+    button, .switch{ min-height: var(--tap); }
   </style>
 </head>
 <body>
-  <h1>📦 Bon de livraison – édition de statut</h1>
+  <header class="topbar">
+    <div class="row" style="margin-bottom:8px">
+      <div class="title">Commandes</div>
+      <button id="btnFilters" class="btn" aria-pressed="false">Filtres</button>
+      <button id="btnRefresh" class="btn" title="Rafraîchir">↻</button>
+    </div>
+    <div class="row">
+      <input type="date" id="filtre-date" class="field" />
+      <input type="text" id="filtre-commande-texte" class="field grow" placeholder="Rechercher n° commande…" />
+    </div>
+  </header>
 
-  <div class="filtres">
-    <label>📅 Date de livraison <input type="date" id="filtre-date"></label>
-    <label>🔎 Rechercher une commande <input type="text" id="filtre-commande-texte"></label>
-    <label>🏨 Hôtel <select id="filtre-compte"><option value="">(Tous)</option></select></label>
-    <label>🚦 Statut <select id="filtre-statut"><option value="">(Tous)</option></select></label>
-    <label>🧾 Type de devis <select id="filtre-type"><option value="">(Tous)</option></select></label>
-  </div>
+  <!-- Drawer Filtres -->
+  <section id="drawer" class="drawer" aria-hidden="true">
+    <div class="grid">
+      <div class="span2">
+        <label>Préparé</label>
+        <select id="filtre-prepared">
+          <option value="">(Tous)</option>
+          <option value="true">Oui</option>
+          <option value="false">Non</option>
+        </select>
+      </div>
+      <div>
+        <label>Hôtel</label>
+        <select id="filtre-compte"><option value="">(Tous)</option></select>
+      </div>
+      <div>
+        <label>Type de devis</label>
+        <select id="filtre-type"><option value="">(Tous)</option></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="applyFilters" class="btn btn-primary">Appliquer</button>
+      <button id="closeDrawer" class="btn btn-ghost">Fermer</button>
+    </div>
+  </section>
 
-  <div id="app2">Chargement en cours...</div>
+  <main id="app2" class="content">Chargement…</main>
 
   <script>
     let toutesLesDonnees = [];
-    let statutsDispo = [];
     const modificationsLocales = {};
+    let sse;
+    let debounceTimer;
 
-    async function charger() {
+    // --- helpers filtres ---
+    function snapshotFiltres() {
+      return {
+        date:     document.getElementById('filtre-date').value,
+        texte:    document.getElementById('filtre-commande-texte').value,
+        prepared: document.getElementById('filtre-prepared').value,
+        compte:   document.getElementById('filtre-compte').value,
+        type:     document.getElementById('filtre-type').value,
+      };
+    }
+    function restoreFiltres(s) {
+      if(!s) return;
+      document.getElementById('filtre-date').value = s.date;
+      document.getElementById('filtre-commande-texte').value = s.texte;
+
+      // prepared simple
+      document.getElementById('filtre-prepared').value = s.prepared;
+
+      // compte / type doivent exister
+      const c = document.getElementById('filtre-compte');
+      const t = document.getElementById('filtre-type');
+      if ([...c.options].some(o=>o.value===s.compte)) c.value = s.compte;
+      if ([...t.options].some(o=>o.value===s.type))   t.value = s.type;
+    }
+
+    // --- data loading ---
+    async function charger(preserve=false){
+      const snap = preserve ? snapshotFiltres() : null;
       const texteCommande = document.getElementById('filtre-commande-texte').value.trim();
       const date = document.getElementById('filtre-date').value;
 
       let url = '/api2/livraison';
-      if (texteCommande) {
-        url += `?commande=${encodeURIComponent(texteCommande)}`;
-      } else if (date) {
-        url += `?date=${date}`;
-      }
+      if (texteCommande) url += `?commande=${encodeURIComponent(texteCommande)}`;
+      else if (date)     url += `?date=${date}`;
 
-      try {
+      try{
         const res = await fetch(url);
-        if (!res.ok) throw new Error(`Erreur HTTP : ${res.status}`);
+        if(!res.ok) throw new Error('HTTP '+res.status);
         const data = await res.json();
-        toutesLesDonnees = data.lignes;
-        statutsDispo = data.statuts ?? [];
+        toutesLesDonnees = (data.lignes||[]).map(r=>({...r, prepared: !!r.prepared}));
 
-        if (!statutsDispo.includes("préparé")) {
-          statutsDispo.push("préparé");
-        }
-
-        toutesLesDonnees.forEach(row => {
-          if (modificationsLocales[row.id]) {
-            Object.assign(row, modificationsLocales[row.id]);
-          }
+        // réapplique modifs locales
+        toutesLesDonnees.forEach(r=>{
+          if(modificationsLocales[r.id]) Object.assign(r, modificationsLocales[r.id]);
         });
 
         actualiserFiltres();
+        if (preserve) restoreFiltres(snap);
         afficher();
-      } catch (e) {
+      }catch(e){
         console.error(e);
-        document.getElementById('app2').innerHTML = `<p class="vide">❌ Erreur de chargement.</p>`;
+        document.getElementById('app2').innerHTML = `<div class="empty">❌ Erreur de chargement</div>`;
       }
     }
 
-    function actualiserFiltres() {
-      const compteSelect = document.getElementById('filtre-compte');
-      const statutSelect = document.getElementById('filtre-statut');
-      const typeSelect = document.getElementById('filtre-type');
+    function actualiserFiltres(){
+      const compte = document.getElementById('filtre-compte');
+      const type   = document.getElementById('filtre-type');
 
-      const comptes = [...new Set(toutesLesDonnees.map(r => r.compte))];
-      compteSelect.innerHTML = '<option value="">(Tous)</option>' + comptes.map(c => `<option value="${c}">${c}</option>`).join('');
+      const savedC = compte.value;
+      const savedT = type.value;
 
-      const statuts = [...new Set(toutesLesDonnees.map(r => r.statut))];
-      if (!statuts.includes("préparé")) statuts.push("préparé");
-      statutSelect.innerHTML = '<option value="">(Tous)</option>' + statuts.map(s => `<option value="${s}">${s}</option>`).join('');
+      const comptes = [...new Set(toutesLesDonnees.map(r=>r.compte).filter(Boolean))].sort();
+      compte.innerHTML = '<option value="">(Tous)</option>' + comptes.map(c=>`<option value="${c}">${c}</option>`).join('');
+      if (comptes.includes(savedC)) compte.value = savedC;
 
-      const types = [...new Set(toutesLesDonnees.map(r => r.typededevis__c))];
-      typeSelect.innerHTML = '<option value="">(Tous)</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+      const types = [...new Set(toutesLesDonnees.map(r=>r.typededevis__c).filter(Boolean))].sort();
+      type.innerHTML = '<option value="">(Tous)</option>' + types.map(t=>`<option value="${t}">${t}</option>`).join('');
+      if (types.includes(savedT)) type.value = savedT;
     }
 
-    function afficher() {
-      const container = document.getElementById('app2');
-      const texte = document.getElementById('filtre-commande-texte').value.trim().toLowerCase();
-      const compte = document.getElementById('filtre-compte').value;
-      const statut = document.getElementById('filtre-statut').value;
-      const type = document.getElementById('filtre-type').value;
+    function afficher(){
+      const app = document.getElementById('app2');
+      const texte     = document.getElementById('filtre-commande-texte').value.trim().toLowerCase();
+      const preparedV = document.getElementById('filtre-prepared').value;
+      const compteVal = document.getElementById('filtre-compte').value;
+      const typeVal   = document.getElementById('filtre-type').value;
 
-      let data = toutesLesDonnees;
+      let data = toutesLesDonnees.filter(r =>
+        (!texte || String(r.commande).toLowerCase().includes(texte)) &&
+        (!compteVal || r.compte === compteVal) &&
+        (!preparedV || String(!!r.prepared) === preparedV) &&
+        (!typeVal || r.typededevis__c === typeVal)
+      );
 
-      if (!texte) {
-        data = data.filter(r =>
-          (!compte || r.compte === compte) &&
-          (!statut || r.statut === statut) &&
-          (!type || r.typededevis__c === type)
-        );
-      }
-
-      const groupes = {};
-      data.forEach(row => {
-        if (!groupes[row.compte]) groupes[row.compte] = { lignes: [], commandes: new Set() };
-        groupes[row.compte].lignes.push(row);
-        groupes[row.compte].commandes.add(row.commande);
-      });
-
-      container.innerHTML = '';
-      if (data.length === 0) {
-        container.innerHTML = `<p class="vide">🔍 Aucune donnée ne correspond aux filtres.</p>`;
+      if (data.length === 0){
+        app.innerHTML = `<div class="empty">🔍 Aucune donnée pour ces filtres</div>`;
         return;
       }
 
-      Object.entries(groupes).forEach(([compte, info]) => {
-        const bloc = document.createElement('details');
-        bloc.open = true;
+      // Group by hotel
+      const groupes = {};
+      data.forEach(r=>{
+        if(!groupes[r.compte]) groupes[r.compte] = { lignes:[], commandes:new Set() };
+        groupes[r.compte].lignes.push(r);
+        groupes[r.compte].commandes.add(r.commande);
+      });
 
-        const sum = document.createElement('summary');
-        sum.innerText = `🏨 ${compte} – 📟 Commande(s) : ${Array.from(info.commandes).join(', ')}`;
-        bloc.appendChild(sum);
+      app.innerHTML = '';
+      Object.entries(groupes).forEach(([hotel, info])=>{
+        const details = document.createElement('details');
+        details.className = 'group';
+        details.open = true;
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'responsive-table';
+        const summary = document.createElement('summary');
+        const cmds = Array.from(info.commandes).join(', ');
+        summary.innerHTML = `
+          <div class="hotel">${hotel || '—'}</div>
+          <div class="meta">
+            <span>Commandes: ${cmds || '—'}</span>
+            <span>Articles: ${info.lignes.length}</span>
+          </div>`;
+        details.appendChild(summary);
 
-        const table = document.createElement('table');
-        table.innerHTML = `
-          <thead>
-            <tr>
-              <th>Produit</th>
-              <th>Commandé</th>
-              <th>Expédié</th>
-              <th>Qt juste</th>
-              <th>Statut</th>
-              <th>Commentaire</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${info.lignes.map(row => `
-              <tr data-id="${row.id}" data-commande="${row.commande}">
-                <td>${row.produit}</td>
-                <td>${row.nombre_commande}</td>
-                <td>${row.nombre_expedie ?? 0}</td>
-                <td>${row.qt_theorique ?? ''}</td>
-                <td>
-                  <select class="statut" onchange="enregistrerChangement('${row.id}', '${row.commande}', this.value, this.parentElement.nextElementSibling.firstElementChild.value)">
-                    ${statutsDispo.map(s => `<option value="${s}" ${row.statut === s ? 'selected' : ''}>${s}</option>`).join('')}
-                  </select>
-                </td>
-                <td>
-                  <textarea class="commentaire" oninput="enregistrerChangement('${row.id}', '${row.commande}', this.parentElement.previousElementSibling.firstElementChild.value, this.value)">
-                    ${row.commentaire || ''}
-                  </textarea>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        `;
+        info.lignes.forEach(row=>{
+          const card = document.createElement('div');
+          card.className = 'line-card';
+          card.setAttribute('data-id', row.id);
 
-        wrapper.appendChild(table);
-        bloc.appendChild(wrapper);
+          card.innerHTML = `
+            <div class="head">
+              <div class="prod">
+                ${row.produit}
+                <small>#${row.commande || ''}</small>
+              </div>
+              <label class="switch" title="Préparé">
+                <input type="checkbox" ${row.prepared ? 'checked' : ''} onchange="togglePrepare('${row.id}', this)">
+                <span class="slider"></span>
+                <span class="lbl">Préparé</span>
+              </label>
+            </div>
+            <div class="stats">
+              <span class="chip">Commandé: <b>${row.nombre_commande ?? 0}</b></span>
+              <span class="chip">Expédié: <b>${row.nombre_expedie ?? 0}</b></span>
+              <span class="chip">Qt juste: <b>${row.qt_theorique ?? ''}</b></span>
+            </div>
+          `;
+          details.appendChild(card);
+        });
 
-        const btn = document.createElement('button');
-        btn.textContent = '📤 Sauvegarder';
-        btn.onclick = async () => {
-          const rows = Object.values(modificationsLocales);
-          try {
-            const res = await fetch('/api2/save', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(rows)
-            });
-            alert(res.ok ? '✅ Données enregistrées' : '❌ Erreur d\'enregistrement');
-          } catch (err) {
-            console.error(err);
-            alert("❌ Problème de connexion à l'API");
-          }
-        };
-
-        bloc.appendChild(btn);
-        container.appendChild(bloc);
+        app.appendChild(details);
       });
     }
 
-    function enregistrerChangement(id, commande, statut, commentaire) {
-      modificationsLocales[id] = { id, commande, statut, commentaire };
-      const row = toutesLesDonnees.find(r => r.id === id);
-      if (row) {
-        row.statut = statut;
-        row.commentaire = commentaire;
+    // auto-save + refresh (préserve filtres)
+    async function togglePrepare(id, el){
+      const checked = !!el.checked;
+      modificationsLocales[id] = { id, prepared: checked };
+      const row = toutesLesDonnees.find(r=>r.id===id);
+      if(row) row.prepared = checked;
+
+      el.disabled = true;
+      try{
+        const res = await fetch('/api2/save', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify([{ id, prepared: checked }])
+        });
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        // re-fetch local pour refléter d’autres updates liées
+        await charger(true);
+      }catch(e){
+        alert("❌ Échec d'enregistrement. On rétablit l'état.");
+        el.checked = !checked;
+        if(row) row.prepared = !checked;
+        modificationsLocales[id] = { id, prepared: !checked };
+      }finally{
+        el.disabled = false;
       }
     }
+    window.togglePrepare = togglePrepare; // pour l'attribut onchange
 
-    document.getElementById('filtre-date').addEventListener('input', charger);
-    ['filtre-compte', 'filtre-statut', 'filtre-type'].forEach(id => {
-      document.getElementById(id).addEventListener('input', afficher);
+    // SSE : rafraîchit pour tous sans toucher aux filtres
+    function initSSE(){
+      try{
+        sse = new EventSource('/api2/stream');
+        sse.onmessage = (ev)=>{
+          try{
+            const msg = JSON.parse(ev.data);
+            if(msg?.type === 'prepared_update') charger(true);
+          }catch{}
+        };
+      }catch(e){ console.warn("SSE indisponible", e); }
+    }
+
+    // UI: drawer
+    const drawer = document.getElementById('drawer');
+    const btnFilters = document.getElementById('btnFilters');
+    const btnRefresh = document.getElementById('btnRefresh');
+    const btnApply   = document.getElementById('applyFilters');
+    const btnClose   = document.getElementById('closeDrawer');
+
+    btnFilters.addEventListener('click', ()=>{
+      const open = !drawer.classList.contains('open');
+      drawer.classList.toggle('open', open);
+      drawer.setAttribute('aria-hidden', String(!open));
+      btnFilters.setAttribute('aria-pressed', String(open));
     });
-    document.getElementById('filtre-commande-texte').addEventListener('input', charger);
+    btnClose.addEventListener('click', ()=>{
+      drawer.classList.remove('open'); drawer.setAttribute('aria-hidden','true'); btnFilters.setAttribute('aria-pressed','false');
+    });
+    btnApply.addEventListener('click', ()=>{
+      drawer.classList.remove('open'); drawer.setAttribute('aria-hidden','true'); btnFilters.setAttribute('aria-pressed','false');
+      afficher();
+    });
+    btnRefresh.addEventListener('click', ()=> charger(true));
 
-    window.addEventListener('DOMContentLoaded', () => {
-      const hier = new Date();
-      hier.setDate(hier.getDate() - 1);
+    // Inputs topbar
+    document.getElementById('filtre-date').addEventListener('input', ()=> charger(true));
+    document.getElementById('filtre-commande-texte').addEventListener('input', ()=>{
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(()=> charger(true), 300);
+    });
+
+    // Boot
+    window.addEventListener('DOMContentLoaded', ()=>{
+      const hier = new Date(); hier.setDate(hier.getDate()-1);
       document.getElementById('filtre-date').value = hier.toISOString().split('T')[0];
-      charger();
-      setInterval(charger, 5 * 60 * 1000);
+      charger(true);
+      initSSE();
+      // fallback périodique
+      setInterval(()=> charger(true), 5*60*1000);
     });
   </script>
 </body>
